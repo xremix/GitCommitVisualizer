@@ -59,15 +59,50 @@
         .bar {
             transition: opacity 0.2s;
         }
+        #filterContainer {
+            margin: 20px 0;
+            display: none;
+        }
+        #filterInput {
+            padding: 8px;
+            font-size: 14px;
+            width: 300px;
+            margin-right: 10px;
+        }
+        .filter-label {
+            font-family: Arial, sans-serif;
+            font-size: 14px;
+            margin-right: 10px;
+        }
     </style>
     <script>
-        // Move the visualization code into a function
-        function createVisualization(content) {
+        let originalData = '';  // Store the original data
+
+        function filterData(content, filters) {
+            if (!filters || filters.trim() === '') return content;
+            
+            const filterTerms = filters.split(',').map(term => term.trim()).filter(term => term !== '');
+            const lines = content.trim().split('\n');
+            
+            return lines
+                .filter(line => !filterTerms.some(term => line.includes(term)))
+                .join('\n');
+        }
+
+        function createVisualization(content, filters = '') {
+            // Store original data if not already stored
+            if (!originalData) {
+                originalData = content;
+            }
+
+            // Filter the data
+            const filteredContent = filterData(content, filters);
+            
             // Clear any existing chart
             document.querySelector('#chart-container').innerHTML = '';
             
             // Parse the data
-            const rows = content.trim().split('\n').map(row => {
+            const rows = filteredContent.trim().split('\n').map(row => {
                 const [date, name, commits] = row.trim().split(' ');
                 return {
                     date: date,
@@ -78,8 +113,8 @@
 
             // Increase margins and dimensions
             const margin = {top: 50, right: 160, bottom: 80, left: 80};
-            const width = 1400 - margin.left - margin.right;
-            const height = 800 - margin.top - margin.bottom;
+            const width = 1200 - margin.left - margin.right;
+            const height = 500 - margin.top - margin.bottom;
 
             // Create SVG with new dimensions
             const svg = d3.select('#chart-container')
@@ -99,12 +134,12 @@
             const x0 = d3.scaleBand()
                 .domain(Array.from(groupedData.keys()))
                 .range([0, width])
-                .padding(0.3);  // Increased padding
+                .padding(0.1);  // Reduced padding
 
             const x1 = d3.scaleBand()
                 .domain(users)
                 .range([0, x0.bandwidth()])
-                .padding(0.1);  // Increased padding
+                .padding(0.05);  // Reduced padding
 
             const y = d3.scaleLinear()
                 .domain([0, d3.max(rows, d => d.commits)])
@@ -158,10 +193,10 @@
                     });
                 })
                 .join('rect')
-                .attr('class', d => `bar bar-${d.user}`)  // Add class for targeting
+                .attr('class', d => `bar bar-${d.user}`)
                 .attr('x', d => x1(d.user))
                 .attr('y', d => y(d.commits))
-                .attr('width', x1.bandwidth())
+                .attr('width', Math.max(5, x1.bandwidth()))  // Ensure minimum width of 5px
                 .attr('height', d => height - y(d.commits))
                 .attr('fill', d => color(d.user))
                 .on('mouseover', function(event, d) {
@@ -269,6 +304,7 @@
         document.addEventListener('DOMContentLoaded', function() {
             const dropZone = document.getElementById('dropZone');
             const chartContainer = document.getElementById('chart-container');
+            const filterContainer = document.getElementById('filterContainer');
 
             // Prevent default drag behaviors
             ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
@@ -313,18 +349,29 @@
                 const reader = new FileReader();
 
                 reader.onload = function(e) {
-                    const content = e.target.result;
+                    originalData = e.target.result;
                     dropZone.style.display = 'none';
                     chartContainer.style.display = 'block';
-                    createVisualization(content);
+                    filterContainer.style.display = 'block';
+                    createVisualization(originalData);
                 };
 
                 reader.readAsText(file);
             }
 
+            // Add filter input handler
+            const filterInput = document.getElementById('filterInput');
+            filterInput.addEventListener('input', function(e) {
+                if (originalData) {
+                    createVisualization(originalData, e.target.value);
+                }
+            });
+
             // Also handle the initial demo data if needed
             if (typeof content !== 'undefined') {
+                originalData = content;
                 createVisualization(content);
+                filterContainer.style.display = 'block';
             }
         });
     </script>
@@ -332,6 +379,10 @@
 <body>
     <div id="dropZone">
         <p>Drag and drop your commit data file here</p>
+    </div>
+    <div id="filterContainer">
+        <label class="filter-label" for="filterInput">Exclude entries containing:</label>
+        <input type="text" id="filterInput" placeholder="Enter terms to exclude, separated by commas" value="2018,2019,2020,2021">
     </div>
     <div id="chart-container"></div>
 </body>
