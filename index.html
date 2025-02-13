@@ -158,7 +158,7 @@
             }
 
             // Filter the data
-            const filteredContent = filterData(content, filters);
+            const filteredContent = filterData(content.toLowerCase(), filters.toLowerCase());
             
             // Clear any existing chart
             document.querySelector('#chart-container').innerHTML = '';
@@ -432,7 +432,7 @@
                     dropZone.style.display = 'none';
                     chartContainer.style.display = 'block';
                     filterContainer.style.display = 'block';
-                    createVisualization(originalData);
+                    createVisualization(originalData, document.getElementById('filterInput').value);
                 };
 
                 reader.readAsText(file);
@@ -464,7 +464,7 @@
                     textInput.parentElement.style.display = 'none';
                     chartContainer.style.display = 'block';
                     filterContainer.style.display = 'block';
-                    createVisualization(originalData);
+                    createVisualization(originalData, document.getElementById('filterInput').value);
                 }
             });
 
@@ -489,7 +489,7 @@
     </div>
     <div id="filterContainer">
         <label class="filter-label" for="filterInput">Exclude entries containing:</label>
-        <input type="text" id="filterInput" placeholder="Enter terms to exclude, separated by commas" value="2018,2019,2020,2021">
+        <input type="text" id="filterInput" placeholder="Enter terms to exclude, separated by commas" value="2018,2019,2020,2021,Renovate">
         <button id="viewToggle" class="view-toggle">Show Total Commits</button>
     </div>
     <div id="chart-container"></div>
