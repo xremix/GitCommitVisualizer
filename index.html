@@ -74,9 +74,22 @@
             font-size: 14px;
             margin-right: 10px;
         }
+        .view-toggle {
+            margin-left: 10px;
+            padding: 8px 16px;
+            font-size: 14px;
+            cursor: pointer;
+            background-color: #f0f0f0;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .view-toggle:hover {
+            background-color: #e0e0e0;
+        }
     </style>
     <script>
         let originalData = '';  // Store the original data
+        let showTotalOnly = false;  // Track if we're showing totals only
 
         function filterData(content, filters) {
             if (!filters || filters.trim() === '') return content;
@@ -87,6 +100,23 @@
             return lines
                 .filter(line => !filterTerms.some(term => line.includes(term)))
                 .join('\n');
+        }
+
+        function aggregateByDate(rows) {
+            const totals = new Map();
+            
+            // Sum commits for each date
+            rows.forEach(row => {
+                const currentTotal = totals.get(row.date) || 0;
+                totals.set(row.date, currentTotal + row.commits);
+            });
+
+            // Convert to array format
+            return Array.from(totals).map(([date, commits]) => ({
+                date: date,
+                name: 'Total',
+                commits: commits
+            }));
         }
 
         function createVisualization(content, filters = '') {
@@ -102,7 +132,7 @@
             document.querySelector('#chart-container').innerHTML = '';
             
             // Parse the data
-            const rows = filteredContent.trim().split('\n').map(row => {
+            let rows = filteredContent.trim().split('\n').map(row => {
                 const [date, name, commits] = row.trim().split(' ');
                 return {
                     date: date,
@@ -110,6 +140,11 @@
                     commits: parseInt(commits)
                 };
             });
+
+            // Aggregate data if showing totals only
+            if (showTotalOnly) {
+                rows = aggregateByDate(rows);
+            }
 
             // Increase margins and dimensions
             const margin = {top: 50, right: 160, bottom: 80, left: 80};
@@ -134,12 +169,14 @@
             const x0 = d3.scaleBand()
                 .domain(Array.from(groupedData.keys()))
                 .range([0, width])
-                .padding(0.1);  // Reduced padding
+                .padding(0.1);
 
-            const x1 = d3.scaleBand()
-                .domain(users)
-                .range([0, x0.bandwidth()])
-                .padding(0.05);  // Reduced padding
+            const x1 = showTotalOnly ?
+                d => x0(d) :  // Use full width for total bars
+                d3.scaleBand()
+                    .domain(users)
+                    .range([0, x0.bandwidth()])
+                    .padding(0.05);
 
             const y = d3.scaleLinear()
                 .domain([0, d3.max(rows, d => d.commits)])
@@ -183,6 +220,14 @@
             monthGroups.selectAll('rect')
                 .data(d => {
                     const month = d[0];
+                    if (showTotalOnly) {
+                        const totalCommits = d[1].reduce((sum, item) => sum + item.commits, 0);
+                        return [{
+                            month: month,
+                            user: 'Total',
+                            commits: totalCommits
+                        }];
+                    }
                     return users.map(user => {
                         const userData = d[1].find(item => item.name === user);
                         return {
@@ -194,11 +239,11 @@
                 })
                 .join('rect')
                 .attr('class', d => `bar bar-${d.user}`)
-                .attr('x', d => x1(d.user))
+                .attr('x', d => showTotalOnly ? 0 : x1(d.user))
                 .attr('y', d => y(d.commits))
-                .attr('width', Math.max(5, x1.bandwidth()))  // Ensure minimum width of 5px
+                .attr('width', showTotalOnly ? x0.bandwidth() : Math.max(5, x1.bandwidth()))
                 .attr('height', d => height - y(d.commits))
-                .attr('fill', d => color(d.user))
+                .attr('fill', d => showTotalOnly ? '#666' : color(d.user))
                 .on('mouseover', function(event, d) {
                     tooltip.transition()
                         .duration(200)
@@ -213,79 +258,79 @@
                         .style('opacity', 0);
                 });
 
-            // Update legend with click functionality
-            const legend = svg.append('g')
-                .attr('font-family', 'sans-serif')
-                .attr('font-size', '14px')
-                .attr('text-anchor', 'start')
-                .selectAll('g')
-                .data(users)
-                .join('g')
-                .attr('class', 'legend-item')
-                .attr('transform', (d, i) => `translate(${width + 20},${i * 25})`)
-                .on('click', function(event, d) {
-                    // Toggle the disabled class on the legend item
-                    const legendItem = d3.select(this);
-                    const isDisabled = legendItem.classed('disabled');
-                    legendItem.classed('disabled', !isDisabled);
-
-                    // Toggle the visibility of the corresponding bars
-                    const bars = d3.selectAll(`.bar-${d}`);
-                    bars.style('opacity', isDisabled ? 1 : 0);
-                });
-
-            // Add colored rectangles to legend
-            legend.append('rect')
-                .attr('x', 0)
-                .attr('width', 22)
-                .attr('height', 22)
-                .attr('fill', color);
-
-            // Add text to legend
-            legend.append('text')
-                .attr('x', 30)
-                .attr('y', 16)
-                .attr('class', 'legend-text')
-                .text(d => d);
-
-            // Add a "Toggle All" button
-            const toggleAll = svg.append('g')
-                .attr('class', 'legend-item')
-                .attr('transform', `translate(${width + 20},${users.length * 25 + 10})`)
-                .style('cursor', 'pointer')
-                .on('click', function() {
-                    const allDisabled = legend.nodes()
-                        .every(node => d3.select(node).classed('disabled'));
-
-                    // Toggle all legend items and bars
-                    legend.each(function(d) {
+            // Show/hide legend based on view mode
+            const legendGroup = svg.append('g');
+            if (!showTotalOnly) {
+                // Update legend with click functionality
+                const legend = legendGroup.selectAll('g')
+                    .data(users)
+                    .join('g')
+                    .attr('class', 'legend-item')
+                    .attr('transform', (d, i) => `translate(${width + 20},${i * 25})`)
+                    .on('click', function(event, d) {
+                        // Toggle the disabled class on the legend item
                         const legendItem = d3.select(this);
-                        legendItem.classed('disabled', !allDisabled);
+                        const isDisabled = legendItem.classed('disabled');
+                        legendItem.classed('disabled', !isDisabled);
+
+                        // Toggle the visibility of the corresponding bars
                         const bars = d3.selectAll(`.bar-${d}`);
-                        bars.style('opacity', allDisabled ? 1 : 0);
+                        bars.style('opacity', isDisabled ? 1 : 0);
                     });
-                });
 
-            toggleAll.append('rect')
-                .attr('x', 0)
-                .attr('width', 22)
-                .attr('height', 22)
-                .attr('fill', '#666');
+                // Add colored rectangles to legend
+                legend.append('rect')
+                    .attr('x', 0)
+                    .attr('width', 22)
+                    .attr('height', 22)
+                    .attr('fill', color);
 
-            toggleAll.append('text')
-                .attr('x', 30)
-                .attr('y', 16)
-                .attr('class', 'legend-text')
-                .text('Toggle All');
+                // Add text to legend
+                legend.append('text')
+                    .attr('x', 30)
+                    .attr('y', 16)
+                    .attr('class', 'legend-text')
+                    .text(d => d);
 
-            // Update title with larger font
+                // Add a "Toggle All" button
+                const toggleAll = legendGroup.append('g')
+                    .attr('class', 'legend-item')
+                    .attr('transform', `translate(${width + 20},${users.length * 25 + 10})`)
+                    .style('cursor', 'pointer')
+                    .on('click', function() {
+                        const allDisabled = legend.nodes()
+                            .every(node => d3.select(node).classed('disabled'));
+
+                        // Toggle all legend items and bars
+                        legend.each(function(d) {
+                            const legendItem = d3.select(this);
+                            legendItem.classed('disabled', !allDisabled);
+                            const bars = d3.selectAll(`.bar-${d}`);
+                            bars.style('opacity', allDisabled ? 1 : 0);
+                        });
+                    });
+
+                toggleAll.append('rect')
+                    .attr('x', 0)
+                    .attr('width', 22)
+                    .attr('height', 22)
+                    .attr('fill', '#666');
+
+                toggleAll.append('text')
+                    .attr('x', 30)
+                    .attr('y', 16)
+                    .attr('class', 'legend-text')
+                    .text('Toggle All');
+            }
+
+            // Update title
             svg.append('text')
                 .attr('x', width / 2)
                 .attr('y', -20)
                 .attr('text-anchor', 'middle')
                 .style('font-size', '24px')
                 .style('font-weight', 'bold')
-                .text('Commits per User by Month');
+                .text(`${showTotalOnly ? 'Total' : 'Per-User'} Commits by Month`);
 
             // Add axis labels
             svg.append('text')
@@ -367,6 +412,15 @@
                 }
             });
 
+            // Add view toggle button handler
+            const viewToggle = document.getElementById('viewToggle');
+            viewToggle.addEventListener('click', function() {
+                showTotalOnly = !showTotalOnly;
+                if (originalData) {
+                    createVisualization(originalData, filterInput.value);
+                }
+            });
+
             // Also handle the initial demo data if needed
             if (typeof content !== 'undefined') {
                 originalData = content;
@@ -383,6 +437,7 @@
     <div id="filterContainer">
         <label class="filter-label" for="filterInput">Exclude entries containing:</label>
         <input type="text" id="filterInput" placeholder="Enter terms to exclude, separated by commas" value="2018,2019,2020,2021">
+        <button id="viewToggle" class="view-toggle">Show Total Commits</button>
     </div>
     <div id="chart-container"></div>
 </body>
