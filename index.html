@@ -236,11 +236,6 @@
                 };
             });
 
-            // Filter out hidden users
-            if (!showTotalOnly) {
-                rows = rows.filter(row => !hiddenUsers.has(row.name));
-            }
-
             // Aggregate data if showing totals only
             if (showTotalOnly) {
                 rows = aggregateByDate(rows);
@@ -262,7 +257,7 @@
             // Group data by month and user
             const groupedData = d3.group(rows, d => d.date);
 
-            // Get unique users
+            // Get unique users (don't filter hidden users)
             const users = Array.from(new Set(rows.map(d => d.name)));
 
             // Set up scales
@@ -344,6 +339,7 @@
                 .attr('width', showTotalOnly ? x0.bandwidth() : Math.max(5, x1.bandwidth()))
                 .attr('height', d => height - y(d.commits))
                 .attr('fill', d => showTotalOnly ? '#666' : color(d.user))
+                .style('opacity', d => hiddenUsers.has(d.user) ? 0.1 : 1)
                 .on('mouseover', function(event, d) {
                     tooltip.transition()
                         .duration(200)
@@ -367,6 +363,7 @@
                     .join('g')
                     .attr('class', d => `legend-item${hiddenUsers.has(d) ? ' disabled' : ''}`)
                     .attr('transform', (d, i) => `translate(${width + 20},${i * 25})`)
+                    .style('opacity', d => hiddenUsers.has(d) ? 0.5 : 1)
                     .on('click', function(event, d) {
                         if (hiddenUsers.has(d)) {
                             hiddenUsers.delete(d);
