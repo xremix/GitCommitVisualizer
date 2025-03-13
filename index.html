@@ -234,6 +234,25 @@
         svg text {
             fill: #e0e0e0;
         }
+        #remapInput {
+            width: 100%;
+            padding: 12px 16px;
+            font-size: 14px;
+            border: 2px solid #404040;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+            font-family: monospace;
+            background-color: #2d2d2d;
+            color: #e0e0e0;
+            margin-bottom: 10px;
+        }
+        #remapInput:focus {
+            border-color: #2196F3;
+            outline: none;
+        }
+        #remapInput::placeholder {
+            color: #808080;
+        }
     </style>
     <script>
         let originalData = '';  // Store the original data
@@ -241,7 +260,27 @@
         let showTotalOnly = true;  // Track if we're showing totals only
         let hiddenUsers = new Set(); // Track which users are hidden
 
-        function parseGitLog(logData) {
+        function parseUserRemapping(remapString) {
+            if (!remapString || remapString.trim() === '') return new Map();
+            
+            const remapMap = new Map();
+            const mappings = remapString.split(';').filter(m => m.trim());
+            
+            mappings.forEach(mapping => {
+                const [display, emails] = mapping.split('=').map(s => s.trim());
+                if (display && emails) {
+                    const emailList = emails.split(',').map(e => e.trim());
+                    emailList.forEach(email => remapMap.set(email.toLowerCase(), display));
+                }
+            });
+            
+            return remapMap;
+        }
+
+        function parseGitLog(logData, remapString = '') {
+            // Create user remapping
+            const userRemapping = parseUserRemapping(remapString);
+            
             // Split the log data into lines
             const lines = logData.trim().split('\n');
             
@@ -254,7 +293,8 @@
                 if (!match) return;
                 
                 const [_, hash, authorInfo, dateInfo, message] = match;
-                const author = authorInfo.trim();
+                // Apply remapping if exists, otherwise use original email
+                const author = userRemapping.get(authorInfo.trim().toLowerCase()) || authorInfo.trim();
                 const date = new Date(dateInfo.trim());
                 
                 // Format the date as YYYY-MM
@@ -327,6 +367,9 @@
                 originalData = content;
             }
 
+            // Get the remapping string
+            const remapString = document.getElementById('remapInput').value;
+
             // Check if this is git log data
             const isGitLog = content.split('\n')[0].includes('|');
             
@@ -334,7 +377,7 @@
             let filteredGitLog;
             if (isGitLog) {
                 filteredGitLog = filterData(content, excludeFilters, includeFilters);
-                processedData = parseGitLog(filteredGitLog);
+                processedData = parseGitLog(filteredGitLog, remapString);
             } else {
                 // For already processed data, filter after parsing
                 processedData = filterData(content, excludeFilters, includeFilters);
@@ -658,6 +701,13 @@
             const filterContainer = document.getElementById('filterContainer');
             const textInput = document.getElementById('textInput');
             const loadTextButton = document.getElementById('loadTextButton');
+            const remapInput = document.getElementById('remapInput');
+
+            // Load saved remapping from local storage
+            const savedRemapping = localStorage.getItem('userRemapping');
+            if (savedRemapping) {
+                remapInput.value = savedRemapping;
+            }
 
             // Prevent default drag behaviors
             ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
@@ -768,6 +818,38 @@
                 }
             });
 
+            // Add remap input handler with local storage
+            remapInput.addEventListener('input', function() {
+                // Save to local storage
+                localStorage.setItem('userRemapping', remapInput.value);
+                
+                if (originalData) {
+                    createVisualization(
+                        originalData,
+                        document.getElementById('excludeInput').value,
+                        document.getElementById('includeInput').value
+                    );
+                }
+            });
+
+            // Add a clear mapping button
+            const clearMappingButton = document.createElement('button');
+            clearMappingButton.textContent = 'Clear Mapping';
+            clearMappingButton.className = 'view-toggle';
+            clearMappingButton.style.marginLeft = '10px';
+            clearMappingButton.addEventListener('click', function() {
+                localStorage.removeItem('userRemapping');
+                remapInput.value = '';
+                if (originalData) {
+                    createVisualization(
+                        originalData,
+                        document.getElementById('excludeInput').value,
+                        document.getElementById('includeInput').value
+                    );
+                }
+            });
+            document.querySelector('#filterContainer div:first-child').appendChild(clearMappingButton);
+
             // Also handle the initial demo data if needed
             if (typeof content !== 'undefined') {
                 originalData = content;
@@ -793,6 +875,10 @@ Run this command in your git repository and paste the result here:<br>
 git log --all --pretty=format:"%h|%ae|%ai|%s" --no-merges --since="2020-01-01" | cat
     </div>
     <div id="filterContainer">
+        <div style="margin-bottom: 10px;">
+            <label class="filter-label" for="remapInput">Remap usernames:</label>
+            <input type="text" id="remapInput" placeholder="Format: display1=email1@domain.com,email2@domain.com;display2=email3@domain.com" style="width: 100%;">
+        </div>
         <div style="margin-bottom: 10px;">
             <label class="filter-label" for="includeInput">Include entries containing:</label>
             <input type="text" id="includeInput" placeholder="Enter terms to include, separated by commas" style="width: 300px; padding: 8px; margin-right: 10px;">
