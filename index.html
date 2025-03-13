@@ -134,7 +134,9 @@
     </style>
     <script>
         let originalData = '';  // Store the original data
+        let processedData = ''; // Store the processed data
         let showTotalOnly = true;  // Track if we're showing totals only
+        let hiddenUsers = new Set(); // Track which users are hidden
 
         function parseGitLog(logData) {
             // Split the log data into lines
@@ -213,7 +215,6 @@
             const isGitLog = content.split('\n')[0].includes('|');
             
             // If it's git log data, first filter the raw data, then parse it
-            let processedData;
             if (isGitLog) {
                 const filteredGitLog = filterData(content, filters);
                 processedData = parseGitLog(filteredGitLog);
@@ -234,6 +235,11 @@
                     commits: parseInt(commits)
                 };
             });
+
+            // Filter out hidden users
+            if (!showTotalOnly) {
+                rows = rows.filter(row => !hiddenUsers.has(row.name));
+            }
 
             // Aggregate data if showing totals only
             if (showTotalOnly) {
@@ -359,17 +365,15 @@
                 const legend = legendGroup.selectAll('g')
                     .data(users)
                     .join('g')
-                    .attr('class', 'legend-item')
+                    .attr('class', d => `legend-item${hiddenUsers.has(d) ? ' disabled' : ''}`)
                     .attr('transform', (d, i) => `translate(${width + 20},${i * 25})`)
                     .on('click', function(event, d) {
-                        // Toggle the disabled class on the legend item
-                        const legendItem = d3.select(this);
-                        const isDisabled = legendItem.classed('disabled');
-                        legendItem.classed('disabled', !isDisabled);
-
-                        // Toggle the visibility of the corresponding bars
-                        const bars = d3.selectAll(`.bar-${d}`);
-                        bars.style('opacity', isDisabled ? 1 : 0);
+                        if (hiddenUsers.has(d)) {
+                            hiddenUsers.delete(d);
+                        } else {
+                            hiddenUsers.add(d);
+                        }
+                        createVisualization(originalData, document.getElementById('filterInput').value);
                     });
 
                 // Add colored rectangles to legend
@@ -392,16 +396,13 @@
                     .attr('transform', `translate(${width + 20},${users.length * 25 + 10})`)
                     .style('cursor', 'pointer')
                     .on('click', function() {
-                        const allDisabled = legend.nodes()
-                            .every(node => d3.select(node).classed('disabled'));
-
-                        // Toggle all legend items and bars
-                        legend.each(function(d) {
-                            const legendItem = d3.select(this);
-                            legendItem.classed('disabled', !allDisabled);
-                            const bars = d3.selectAll(`.bar-${d}`);
-                            bars.style('opacity', allDisabled ? 1 : 0);
-                        });
+                        const allDisabled = users.every(user => hiddenUsers.has(user));
+                        if (allDisabled) {
+                            hiddenUsers.clear();
+                        } else {
+                            users.forEach(user => hiddenUsers.add(user));
+                        }
+                        createVisualization(originalData, document.getElementById('filterInput').value);
                     });
 
                 toggleAll.append('rect')
@@ -512,8 +513,9 @@
             const viewToggle = document.getElementById('viewToggle');
             viewToggle.addEventListener('click', function() {
                 showTotalOnly = !showTotalOnly;
+                hiddenUsers.clear(); // Clear hidden users when switching views
                 if (originalData) {
-                    createVisualization(originalData, filterInput.value);
+                    createVisualization(originalData, document.getElementById('filterInput').value);
                 }
             });
 
