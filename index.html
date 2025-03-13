@@ -118,10 +118,62 @@
         #loadTextButton:hover {
             background-color: #e0e0e0;
         }
+        .alert{
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 10px;
+            padding: 10px;
+            border-radius: 4px;
+            background-color: #f0f0f0;
+            border: 1px solid #ccc;
+        }
+        .alert-info{
+            background-color: #e1f5fe;
+            border-color: #2196f3;
+        }
     </style>
     <script>
         let originalData = '';  // Store the original data
         let showTotalOnly = true;  // Track if we're showing totals only
+
+        function parseGitLog(logData) {
+            // Split the log data into lines
+            const lines = logData.trim().split('\n');
+            
+            // Create a map to store commits by user and month
+            const commitsByUserAndMonth = new Map();
+            
+            lines.forEach(line => {
+                // Try to match the git log format
+                const match = line.match(/^.*\|(.*)\|(.*)$/);
+                if (!match) return;
+                
+                const [_, authorInfo, dateInfo] = match;
+                const author = authorInfo.trim();
+                const date = new Date(dateInfo.trim());
+                
+                // Format the date as YYYY-MM
+                const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+                
+                // Create the key for the map
+                const key = `${monthKey}|${author}`;
+                
+                // Increment the commit count
+                commitsByUserAndMonth.set(key, (commitsByUserAndMonth.get(key) || 0) + 1);
+            });
+            
+            // Convert the map to the required format
+            let result = [];
+            for (const [key, commits] of commitsByUserAndMonth) {
+                const [month, author] = key.split('|');
+                result.push(`${month} ${author} ${commits}`);
+            }
+            
+            // Sort by date and author
+            result.sort();
+            
+            return result.join('\n');
+        }
 
         function filterData(content, filters) {
             if (!filters || filters.trim() === '') return content;
@@ -459,7 +511,10 @@
             loadTextButton.addEventListener('click', function() {
                 const text = textInput.value.trim();
                 if (text) {
-                    originalData = text;
+                    // Try to parse as git log if it matches the format
+                    const isGitLog = text.split('\n')[0].includes('|');
+                    originalData = isGitLog ? parseGitLog(text) : text;
+                    
                     dropZone.style.display = 'none';
                     textInput.parentElement.style.display = 'none';
                     chartContainer.style.display = 'block';
@@ -483,9 +538,12 @@
             <p>Drag and drop your commit data file here</p>
         </div>
         <div class="text-input-container">
-            <textarea id="textInput" placeholder="Or paste your commit data here..."></textarea>
+            <textarea id="textInput" placeholder="Paste your git log data here..."></textarea>
             <button id="loadTextButton">Load Data</button>
         </div>
+    </div>
+    <div class="alert alert-info">
+Paste your git log data here. Format: git log --pretty=format:'%h|%ae|%ai' --no-merges
     </div>
     <div id="filterContainer">
         <label class="filter-label" for="filterInput">Exclude entries containing:</label>
