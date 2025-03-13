@@ -131,6 +131,25 @@
             background-color: #e1f5fe;
             border-color: #2196f3;
         }
+        #rawDataContainer {
+            margin-top: 20px;
+            padding: 20px;
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            font-family: monospace;
+            white-space: pre;
+            overflow-x: auto;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        #rawDataContainer .header {
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #666;
+            font-family: Arial, sans-serif;
+        }
     </style>
     <script>
         let originalData = '';  // Store the original data
@@ -228,12 +247,26 @@
             const isGitLog = content.split('\n')[0].includes('|');
             
             // If it's git log data, first filter the raw data, then parse it
+            let filteredGitLog;
             if (isGitLog) {
-                const filteredGitLog = filterData(content, excludeFilters, includeFilters);
+                filteredGitLog = filterData(content, excludeFilters, includeFilters);
                 processedData = parseGitLog(filteredGitLog);
             } else {
                 // For already processed data, filter after parsing
                 processedData = filterData(content, excludeFilters, includeFilters);
+            }
+
+            // Update raw data display
+            const rawDataContainer = document.getElementById('rawDataContainer');
+            if (isGitLog && filteredGitLog) {
+                rawDataContainer.innerHTML = '<div class="header">Filtered Git Log Data:</div>' + 
+                    filteredGitLog.split('\n').map(line => {
+                        const [hash, email, date, message] = line.split('|');
+                        return `${hash.padEnd(8)} | ${email.padEnd(30)} | ${date.padEnd(25)} | ${message}`;
+                    }).join('\n');
+                rawDataContainer.style.display = 'block';
+            } else {
+                rawDataContainer.style.display = 'none';
             }
 
             // Clear any existing chart
@@ -513,6 +546,7 @@
                     dropZone.style.display = 'none';
                     chartContainer.style.display = 'block';
                     filterContainer.style.display = 'block';
+                    rawDataContainer.style.display = 'block';
                     createVisualization(
                         originalData, 
                         document.getElementById('excludeInput').value,
@@ -559,12 +593,13 @@
                 if (text) {
                     // Try to parse as git log if it matches the format
                     const isGitLog = text.split('\n')[0].includes('|');
-                    originalData = isGitLog ? parseGitLog(text) : text;
+                    originalData = text;
                     
                     dropZone.style.display = 'none';
                     textInput.parentElement.style.display = 'none';
                     chartContainer.style.display = 'block';
                     filterContainer.style.display = 'block';
+                    rawDataContainer.style.display = 'block';
                     createVisualization(
                         originalData, 
                         document.getElementById('excludeInput').value,
@@ -578,6 +613,7 @@
                 originalData = content;
                 createVisualization(content);
                 filterContainer.style.display = 'block';
+                rawDataContainer.style.display = 'block';
             }
         });
     </script>
@@ -608,5 +644,6 @@ git log --all --pretty=format:"%h|%ae|%ai|%s" --no-merges --since="2020-01-01" |
         <button id="viewToggle" class="view-toggle">Show Total Commits</button>
     </div>
     <div id="chart-container"></div>
+    <div id="rawDataContainer"></div>
 </body>
 </html>
