@@ -145,10 +145,10 @@
             
             lines.forEach(line => {
                 // Try to match the git log format
-                const match = line.match(/^.*\|(.*)\|(.*)$/);
+                const match = line.match(/^([^|]+)\|([^|]+)\|([^|]+)\|(.*)$/);
                 if (!match) return;
                 
-                const [_, authorInfo, dateInfo] = match;
+                const [_, hash, authorInfo, dateInfo, message] = match;
                 const author = authorInfo.trim();
                 const date = new Date(dateInfo.trim());
                 
@@ -182,7 +182,7 @@
             const lines = content.trim().split('\n');
             
             return lines
-                .filter(line => !filterTerms.some(term => line.includes(term)))
+                .filter(line => !filterTerms.some(term => line.toLowerCase().includes(term.toLowerCase())))
                 .join('\n');
         }
 
@@ -209,14 +209,24 @@
                 originalData = content;
             }
 
-            // Filter the data
-            const filteredContent = filterData(content.toLowerCase(), filters.toLowerCase());
+            // Check if this is git log data
+            const isGitLog = content.split('\n')[0].includes('|');
             
+            // If it's git log data, first filter the raw data, then parse it
+            let processedData;
+            if (isGitLog) {
+                const filteredGitLog = filterData(content, filters);
+                processedData = parseGitLog(filteredGitLog);
+            } else {
+                // For already processed data, filter after parsing
+                processedData = filterData(content, filters);
+            }
+
             // Clear any existing chart
             document.querySelector('#chart-container').innerHTML = '';
             
             // Parse the data
-            let rows = filteredContent.trim().split('\n').map(row => {
+            let rows = processedData.trim().split('\n').map(row => {
                 const [date, name, commits] = row.trim().split(' ');
                 return {
                     date: date,
@@ -543,11 +553,12 @@
         </div>
     </div>
     <div class="alert alert-info">
-Paste your git log data here. Format: git log --pretty=format:'%h|%ae|%ai' --no-merges
+Run this command in your git repository and paste the result here:<br>
+git log --all --pretty=format:"%h|%ae|%ai|%s" --no-merges --since="2020-01-01" | cat
     </div>
     <div id="filterContainer">
         <label class="filter-label" for="filterInput">Exclude entries containing:</label>
-        <input type="text" id="filterInput" placeholder="Enter terms to exclude, separated by commas" value="2017,2018,2019,2020,2021,2022,2023,Renovate">
+        <input type="text" id="filterInput" placeholder="Enter terms to exclude, separated by commas" value="Renovate,Dependabot">
         <button id="viewToggle" class="view-toggle">Show Total Commits</button>
     </div>
     <div id="chart-container"></div>
