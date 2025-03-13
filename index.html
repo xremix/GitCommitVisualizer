@@ -177,15 +177,28 @@
             return result.join('\n');
         }
 
-        function filterData(content, filters) {
-            if (!filters || filters.trim() === '') return content;
-            
-            const filterTerms = filters.split(',').map(term => term.trim()).filter(term => term !== '');
+        function filterData(content, excludeFilters = '', includeFilters = '') {
             const lines = content.trim().split('\n');
             
-            return lines
-                .filter(line => !filterTerms.some(term => line.toLowerCase().includes(term.toLowerCase())))
-                .join('\n');
+            let filteredLines = lines;
+
+            // Apply exclude filters if any
+            if (excludeFilters && excludeFilters.trim() !== '') {
+                const excludeTerms = excludeFilters.split(',').map(term => term.trim()).filter(term => term !== '');
+                filteredLines = filteredLines.filter(line => 
+                    !excludeTerms.some(term => line.toLowerCase().includes(term.toLowerCase()))
+                );
+            }
+
+            // Apply include filters if any
+            if (includeFilters && includeFilters.trim() !== '') {
+                const includeTerms = includeFilters.split(',').map(term => term.trim()).filter(term => term !== '');
+                filteredLines = filteredLines.filter(line => 
+                    includeTerms.some(term => line.toLowerCase().includes(term.toLowerCase()))
+                );
+            }
+
+            return filteredLines.join('\n');
         }
 
         function aggregateByDate(rows) {
@@ -205,7 +218,7 @@
             }));
         }
 
-        function createVisualization(content, filters = '') {
+        function createVisualization(content, excludeFilters = '', includeFilters = '') {
             // Store original data if not already stored
             if (!originalData) {
                 originalData = content;
@@ -216,11 +229,11 @@
             
             // If it's git log data, first filter the raw data, then parse it
             if (isGitLog) {
-                const filteredGitLog = filterData(content, filters);
+                const filteredGitLog = filterData(content, excludeFilters, includeFilters);
                 processedData = parseGitLog(filteredGitLog);
             } else {
                 // For already processed data, filter after parsing
-                processedData = filterData(content, filters);
+                processedData = filterData(content, excludeFilters, includeFilters);
             }
 
             // Clear any existing chart
@@ -370,7 +383,11 @@
                         } else {
                             hiddenUsers.add(d);
                         }
-                        createVisualization(originalData, document.getElementById('filterInput').value);
+                        createVisualization(
+                            originalData, 
+                            document.getElementById('excludeInput').value,
+                            document.getElementById('includeInput').value
+                        );
                     });
 
                 // Add colored rectangles to legend
@@ -399,7 +416,11 @@
                         } else {
                             users.forEach(user => hiddenUsers.add(user));
                         }
-                        createVisualization(originalData, document.getElementById('filterInput').value);
+                        createVisualization(
+                            originalData, 
+                            document.getElementById('excludeInput').value,
+                            document.getElementById('includeInput').value
+                        );
                     });
 
                 toggleAll.append('rect')
@@ -492,18 +513,30 @@
                     dropZone.style.display = 'none';
                     chartContainer.style.display = 'block';
                     filterContainer.style.display = 'block';
-                    createVisualization(originalData, document.getElementById('filterInput').value);
+                    createVisualization(
+                        originalData, 
+                        document.getElementById('excludeInput').value,
+                        document.getElementById('includeInput').value
+                    );
                 };
 
                 reader.readAsText(file);
             }
 
-            // Add filter input handler
-            const filterInput = document.getElementById('filterInput');
-            filterInput.addEventListener('input', function(e) {
-                if (originalData) {
-                    createVisualization(originalData, e.target.value);
-                }
+            // Add filter input handlers
+            const excludeInput = document.getElementById('excludeInput');
+            const includeInput = document.getElementById('includeInput');
+
+            [excludeInput, includeInput].forEach(input => {
+                input.addEventListener('input', function() {
+                    if (originalData) {
+                        createVisualization(
+                            originalData,
+                            excludeInput.value,
+                            includeInput.value
+                        );
+                    }
+                });
             });
 
             // Add view toggle button handler
@@ -512,7 +545,11 @@
                 showTotalOnly = !showTotalOnly;
                 hiddenUsers.clear(); // Clear hidden users when switching views
                 if (originalData) {
-                    createVisualization(originalData, document.getElementById('filterInput').value);
+                    createVisualization(
+                        originalData, 
+                        document.getElementById('excludeInput').value,
+                        document.getElementById('includeInput').value
+                    );
                 }
             });
 
@@ -528,7 +565,11 @@
                     textInput.parentElement.style.display = 'none';
                     chartContainer.style.display = 'block';
                     filterContainer.style.display = 'block';
-                    createVisualization(originalData, document.getElementById('filterInput').value);
+                    createVisualization(
+                        originalData, 
+                        document.getElementById('excludeInput').value,
+                        document.getElementById('includeInput').value
+                    );
                 }
             });
 
@@ -556,8 +597,14 @@ Run this command in your git repository and paste the result here:<br>
 git log --all --pretty=format:"%h|%ae|%ai|%s" --no-merges --since="2020-01-01" | cat
     </div>
     <div id="filterContainer">
-        <label class="filter-label" for="filterInput">Exclude entries containing:</label>
-        <input type="text" id="filterInput" placeholder="Enter terms to exclude, separated by commas" value="Renovate,Dependabot">
+        <div style="margin-bottom: 10px;">
+            <label class="filter-label" for="includeInput">Include entries containing:</label>
+            <input type="text" id="includeInput" placeholder="Enter terms to include, separated by commas" style="width: 300px; padding: 8px; margin-right: 10px;">
+        </div>
+        <div style="margin-bottom: 10px;">
+            <label class="filter-label" for="excludeInput">Exclude entries containing:</label>
+            <input type="text" id="excludeInput" placeholder="Enter terms to exclude, separated by commas" value="Renovate,Dependabot" style="width: 300px; padding: 8px; margin-right: 10px;">
+        </div>
         <button id="viewToggle" class="view-toggle">Show Total Commits</button>
     </div>
     <div id="chart-container"></div>
