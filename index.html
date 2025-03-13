@@ -6,27 +6,33 @@
     <title>Commits per User by Month</title>
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <style>
+        body {
+            background-color: #1a1a1a;
+            color: #e0e0e0;
+            margin: 20px;
+        }
         .bar-group:hover {
             opacity: 0.8;
         }
         .tooltip {
             position: absolute;
-            background-color: rgba(255, 255, 255, 0.95);
+            background-color: rgba(33, 33, 33, 0.95);
             padding: 15px;
             border: none;
             border-radius: 8px;
             pointer-events: none;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             font-size: 14px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
             transition: all 0.2s ease;
+            color: #e0e0e0;
         }
         .tooltip .title {
             font-weight: 600;
             margin-bottom: 5px;
         }
         .tooltip .value {
-            color: #666;
+            color: #b0b0b0;
         }
         .input-container {
             display: flex;
@@ -46,13 +52,13 @@
             font-size: 18px;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             color: #2196F3;
-            background-color: rgba(33, 150, 243, 0.05);
+            background-color: rgba(33, 150, 243, 0.1);
         }
         #dropZone.dragover {
-            background-color: rgba(33, 150, 243, 0.1);
+            background-color: rgba(33, 150, 243, 0.15);
             border-color: #1976D2;
             transform: scale(1.02);
-            box-shadow: 0 4px 12px rgba(33, 150, 243, 0.2);
+            box-shadow: 0 4px 12px rgba(33, 150, 243, 0.3);
         }
         #chart-container {
             display: none;
@@ -61,20 +67,20 @@
         .axis text {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             font-size: 12px;
-            fill: #666;
+            fill: #b0b0b0;
         }
         .axis line, .axis path {
-            stroke: #e0e0e0;
+            stroke: #404040;
         }
         .axis-label {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             font-size: 14px;
-            fill: #666;
+            fill: #b0b0b0;
         }
         .legend-text {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             font-size: 14px;
-            fill: #666;
+            fill: #b0b0b0;
         }
         .legend-item {
             cursor: pointer;
@@ -110,7 +116,7 @@
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             font-size: 14px;
             margin-right: 12px;
-            color: #424242;
+            color: #e0e0e0;
             font-weight: 500;
         }
         .view-toggle {
@@ -146,35 +152,39 @@
             font-size: 14px;
             width: 300px;
             margin-right: 10px;
-            border: 2px solid #e0e0e0;
+            border: 2px solid #404040;
             border-radius: 8px;
             transition: all 0.2s ease;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            background-color: #2d2d2d;
+            color: #e0e0e0;
         }
         input[type="text"]:focus {
             border-color: #2196F3;
-            box-shadow: 0 2px 8px rgba(33, 150, 243, 0.2);
+            box-shadow: 0 2px 8px rgba(33, 150, 243, 0.3);
             outline: none;
         }
         input[type="text"]::placeholder {
-            color: #9e9e9e;
+            color: #808080;
         }
         #textInput {
             width: 100%;
             height: 160px;
             padding: 16px;
-            border: 2px solid #e0e0e0;
+            border: 2px solid #404040;
             border-radius: 8px;
             font-family: monospace;
             font-size: 14px;
             resize: none;
             transition: all 0.2s ease;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            background-color: #2d2d2d;
+            color: #e0e0e0;
         }
         #textInput:focus {
             border-color: #2196F3;
-            box-shadow: 0 2px 8px rgba(33, 150, 243, 0.2);
+            box-shadow: 0 2px 8px rgba(33, 150, 243, 0.3);
             outline: none;
         }
         #loadTextButton {
@@ -201,24 +211,24 @@
         .alert {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             font-size: 13px;
-            color: #424242;
+            color: #e0e0e0;
             margin-bottom: 16px;
             padding: 16px;
             border-radius: 8px;
-            background-color: #f5f5f5;
+            background-color: #2d2d2d;
             border: none;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
         }
         .alert-info {
-            background-color: rgba(33, 150, 243, 0.1);
-            color: #1976D2;
+            background-color: rgba(33, 150, 243, 0.15);
+            color: #2196F3;
             border: none;
         }
         #rawDataContainer {
             margin-top: 20px;
             padding: 20px;
-            background-color: #f8f9fa;
-            border: 1px solid #dee2e6;
+            background-color: #2d2d2d;
+            border: 1px solid #404040;
             border-radius: 4px;
             font-family: monospace;
             white-space: pre;
@@ -226,12 +236,16 @@
             font-size: 12px;
             max-height: 300px;
             overflow-y: auto;
+            color: #e0e0e0;
         }
         #rawDataContainer .header {
             font-weight: bold;
             margin-bottom: 10px;
-            color: #666;
+            color: #b0b0b0;
             font-family: Arial, sans-serif;
+        }
+        svg text {
+            fill: #e0e0e0;
         }
     </style>
     <script>
@@ -439,7 +453,7 @@
                 )
                 .call(g => g.select('.domain').remove())
                 .call(g => g.selectAll('.tick line')
-                    .attr('stroke', '#f0f0f0')
+                    .attr('stroke', '#333333')
                     .attr('stroke-dasharray', '2,2'));
 
             svg.append('g')
@@ -450,7 +464,7 @@
                 )
                 .call(g => g.select('.domain').remove())
                 .call(g => g.selectAll('.tick line')
-                    .attr('stroke', '#f0f0f0')
+                    .attr('stroke', '#333333')
                     .attr('stroke-dasharray', '2,2'));
 
             // Add X axis with larger font
